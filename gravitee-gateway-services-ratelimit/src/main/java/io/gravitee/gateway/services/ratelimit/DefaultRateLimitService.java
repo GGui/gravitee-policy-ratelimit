@@ -18,6 +18,9 @@ package io.gravitee.gateway.services.ratelimit;
 import io.gravitee.repository.ratelimit.api.RateLimitRepository;
 import io.gravitee.repository.ratelimit.api.RateLimitService;
 import io.gravitee.repository.ratelimit.model.RateLimit;
+import io.reactivex.Single;
+
+import java.util.function.Supplier;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -28,6 +31,7 @@ public class DefaultRateLimitService implements RateLimitService {
     private RateLimitRepository rateLimitRepository;
     private RateLimitRepository asyncRateLimitRepository;
 
+    /*
     @Override
     public RateLimit get(String rateLimitKey, boolean async) {
         return getRateLimitRepository(async).get(rateLimitKey);
@@ -37,6 +41,7 @@ public class DefaultRateLimitService implements RateLimitService {
     public void save(RateLimit rateLimit, boolean async) {
         getRateLimitRepository(async).save(rateLimit);
     }
+    */
 
     private RateLimitRepository getRateLimitRepository(boolean async) {
         return (async) ? asyncRateLimitRepository : rateLimitRepository;
@@ -56,5 +61,10 @@ public class DefaultRateLimitService implements RateLimitService {
 
     public void setRateLimitRepository(RateLimitRepository rateLimitRepository) {
         this.rateLimitRepository = rateLimitRepository;
+    }
+
+    @Override
+    public Single<RateLimit> incrementAndGet(String key, boolean async, Supplier<RateLimit> supplier) {
+        return getRateLimitRepository(async).incrementAndGet(key, supplier);
     }
 }

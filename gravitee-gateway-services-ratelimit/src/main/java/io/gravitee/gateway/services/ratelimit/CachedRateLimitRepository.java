@@ -17,12 +17,13 @@ package io.gravitee.gateway.services.ratelimit;
 
 import io.gravitee.repository.ratelimit.api.RateLimitRepository;
 import io.gravitee.repository.ratelimit.model.RateLimit;
+import io.reactivex.Single;
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Iterator;
+import java.util.function.Supplier;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -39,25 +40,10 @@ class CachedRateLimitRepository implements RateLimitRepository {
     }
 
     @Override
-    public RateLimit get(String rateLimitKey) {
-        LOGGER.debug("Retrieve rate-limiting for {} from {}", rateLimitKey, cache.getName());
+    public Single<RateLimit> incrementAndGet(String key, Supplier<RateLimit> supplier) {
+        LOGGER.debug("Retrieve rate-limiting for {} from {}", key, cache.getName());
 
-        Element elt = cache.get(rateLimitKey);
-        return (elt != null) ? (RateLimit) elt.getObjectValue() : null;
-    }
-
-    @Override
-    public void save(RateLimit rateLimit) {
-        long ttlInMillis = rateLimit.getResetTime() - System.currentTimeMillis();
-        if (ttlInMillis > 0L) {
-            int ttl = (int) (ttlInMillis / 1000L);
-            LOGGER.debug("Put rate-limiting {} with a TTL {} into {}", rateLimit, ttl, cache.getName());
-            cache.put(new Element(rateLimit.getKey(), rateLimit, 0,ttl));
-        }
-    }
-
-    @Override
-    public Iterator<RateLimit> findAsyncAfter(long timestamp) {
-        throw new IllegalStateException();
+        Element elt = cache.get(key);
+        return (elt != null) ? Single.just((RateLimit) elt.getObjectValue()) : Single.just(supplier.get());
     }
 }

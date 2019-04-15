@@ -17,10 +17,12 @@ package io.gravitee.policy.ratelimit.local;
 
 import io.gravitee.repository.ratelimit.api.RateLimitService;
 import io.gravitee.repository.ratelimit.model.RateLimit;
+import io.reactivex.Single;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -34,6 +36,7 @@ public class LocalCacheRateLimitProvider implements RateLimitService {
         rateLimits.clear();
     }
 
+    /*
     @Override
     public RateLimit get(String rateLimitKey, boolean sync) {
         return rateLimits.getOrDefault(rateLimitKey, new RateLimit(rateLimitKey));
@@ -42,5 +45,13 @@ public class LocalCacheRateLimitProvider implements RateLimitService {
     @Override
     public void save(RateLimit rateLimit, boolean sync) {
         rateLimits.put(rateLimit.getKey(), rateLimit);
+    }
+    */
+
+    @Override
+    public Single<RateLimit> incrementAndGet(String key, boolean async, Supplier<RateLimit> supplier) {
+        RateLimit rateLimit = rateLimits.getOrDefault(key, supplier.get());
+        rateLimit.setCounter(rateLimit.getCounter() + 1);
+        return Single.just(rateLimit);
     }
 }

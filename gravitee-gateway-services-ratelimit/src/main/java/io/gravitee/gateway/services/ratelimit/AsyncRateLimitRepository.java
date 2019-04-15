@@ -18,9 +18,11 @@ package io.gravitee.gateway.services.ratelimit;
 import io.gravitee.gateway.services.ratelimit.util.KeySplitter;
 import io.gravitee.repository.ratelimit.api.RateLimitRepository;
 import io.gravitee.repository.ratelimit.model.RateLimit;
+import io.reactivex.Single;
+import io.reactivex.functions.BiFunction;
 
-import java.util.Iterator;
 import java.util.concurrent.BlockingQueue;
+import java.util.function.Supplier;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -31,6 +33,47 @@ public class AsyncRateLimitRepository implements RateLimitRepository {
     private RateLimitRepository localCacheRateLimitRepository;
     private RateLimitRepository aggregateCacheRateLimitRepository;
     private BlockingQueue<RateLimit> rateLimitsQueue;
+
+    @Override
+    public Single<RateLimit> incrementAndGet(String key, Supplier<RateLimit> supplier) {
+        return
+                // Get data from local cache
+                localCacheRateLimitRepository
+                        .incrementAndGet(key,  supplier)
+                        .zipWith(
+                                // Aggregate counter with data from aggregate cache
+                                // Split the key to remove the gateway_id and get only the needed part
+                                aggregateCacheRateLimitRepository.incrementAndGet(KeySplitter.split(key)[1], supplier)
+                                , new BiFunction<RateLimit, RateLimit, RateLimit>() {
+                            @Override
+                            public RateLimit apply(RateLimit local, RateLimit aggregate) throws Exception {
+                                local.setCounter(local.getCounter() + aggregate.getCounter());
+                                AggregateRateLimit extendRateLimit = new AggregateRateLimit(local);
+                                extendRateLimit.setAggregateCounter(aggregate.getCounter());
+                                return extendRateLimit;
+                            }
+                        });
+/*
+
+        RateLimit aggregateRateLimit = aggregateCacheRateLimitRepository.get(parts[1]);
+        if (aggregateRateLimit != null) {
+            cachedRateLimit.setCounter(cachedRateLimit.getCounter() + aggregateRateLimit.getCounter());
+            AggregateRateLimit extendRateLimit = new AggregateRateLimit(cachedRateLimit);
+            extendRateLimit.setAggregateCounter(aggregateRateLimit.getCounter());
+            return extendRateLimit;
+        }
+
+        return cachedRateLimit;
+*/
+    }
+
+    /*
+    private Single<RateLimit> getDistributedRateLimit(String key, Supplier<RateLimit> supplier) {
+
+        String [] parts = KeySplitter.split(key);
+        return ;
+    }
+
 
     @Override
     public RateLimit get(String rateLimitKey) {
@@ -71,6 +114,7 @@ public class AsyncRateLimitRepository implements RateLimitRepository {
     public Iterator<RateLimit> findAsyncAfter(long timestamp) {
         throw new IllegalStateException();
     }
+    */
 
     public void setLocalCacheRateLimitRepository(RateLimitRepository localCacheRateLimitRepository) {
         this.localCacheRateLimitRepository = localCacheRateLimitRepository;
