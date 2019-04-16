@@ -64,7 +64,7 @@ public class DefaultRateLimitService implements RateLimitService {
     }
 
     @Override
-    public Single<RateLimit> incrementAndGet(String key, boolean async, Supplier<RateLimit> supplier) {
-        return getRateLimitRepository(async).incrementAndGet(key, supplier);
+    public Single<RateLimit> incrementAndGet(String key, long weight, boolean async, Supplier<RateLimit> supplier) {
+        return getRateLimitRepository(async).incrementAndGet(key, weight, supplier);
     }
 }

@@ -21,7 +21,6 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -52,8 +51,7 @@ class RateLimitUpdater implements Runnable {
                 while (!queue.isEmpty()) {
                     rateLimit = queue.poll(getPollingTimeout(), TimeUnit.MILLISECONDS);
                     if (rateLimit != null) {
-                        RateLimit finalRateLimit = rateLimit;
-                        delegateRateLimitRepository.incrementAndGet(rateLimit.getKey(), () -> finalRateLimit);
+                        delegateRateLimitRepository.save(rateLimit);
                     }
                 }
             } catch (InterruptedException ie) {

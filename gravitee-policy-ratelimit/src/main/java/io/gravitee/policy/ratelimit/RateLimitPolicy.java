@@ -104,9 +104,10 @@ public class RateLimitPolicy {
                         rateLimitConfiguration.getPeriodTimeUnit());
 
                 RateLimit rate = new RateLimit(key);
-                rate.setCounter(0);
+                rate.setLimit(rateLimitConfiguration.getLimit());
                 rate.setResetTime(resetTimeMillis);
                 rate.setAsync(rateLimitPolicyConfiguration.isAsync());
+                rate.setSubscription((String) executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID));
                 return rate;
             }
         });
@@ -120,9 +121,9 @@ public class RateLimitPolicy {
             }
 
             if (rate.getCounter() <= rateLimitConfiguration.getLimit()) {
-                policyChain.failWith(createLimitExceeded(rateLimitConfiguration));
-            } else {
                 policyChain.doNext(request, response);
+            } else {
+                policyChain.failWith(createLimitExceeded(rateLimitConfiguration));
             }
         }, throwable -> {
             // Set Rate Limit headers on response

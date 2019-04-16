@@ -105,7 +105,7 @@ public class QuotaPolicy {
                         quotaConfiguration.getPeriodTimeUnit());
 
                 RateLimit rate = new RateLimit(key);
-                rate.setCounter(0);
+                rate.setLimit(quotaConfiguration.getLimit());
                 rate.setResetTime(resetTimeMillis);
                 rate.setAsync(quotaPolicyConfiguration.isAsync());
                 return rate;
@@ -121,9 +121,9 @@ public class QuotaPolicy {
             }
 
             if (rate.getCounter() <= quotaConfiguration.getLimit()) {
-                policyChain.failWith(createLimitExceeded(quotaConfiguration));
-            } else {
                 policyChain.doNext(request, response);
+            } else {
+                policyChain.failWith(createLimitExceeded(quotaConfiguration));
             }
         }, throwable -> {
             // Set Rate Limit headers on response

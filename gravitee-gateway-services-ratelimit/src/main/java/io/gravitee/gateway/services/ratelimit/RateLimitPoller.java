@@ -43,7 +43,6 @@ class RateLimitPoller implements Runnable {
 
     @Override
     public void run() {
-        /*
         try {
             LOGGER.debug("Refresh rate-limits from repository");
             Iterator<RateLimit> rateLimitIterator = delegateRateLimitRepository.findAsyncAfter(lastCheck);
@@ -77,11 +76,9 @@ class RateLimitPoller implements Runnable {
         } catch (Exception ex) {
             LOGGER.error("Unable to retrieve latest values of rate-limit from repository", ex);
         }
-        */
     }
 
     private void updateAggregateRateLimit(String rateLimitKey, RateLimit rateLimit, long hits) {
-        /*
         RateLimit aggRateLimit = aggregateCacheRateLimitRepository.get(rateLimitKey);
 
         if (aggRateLimit == null) {
@@ -98,7 +95,6 @@ class RateLimitPoller implements Runnable {
 
         aggregateCacheRateLimitRepository.save(aggRateLimit);
         aggregateCacheRateLimitRepository.save(rateLimit);
-        */
     }
 
     public void setRateLimitRepository(RateLimitRepository delegateRateLimitRepository) {
