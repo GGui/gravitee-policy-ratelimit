@@ -28,7 +28,7 @@ import java.util.function.Supplier;
 
 public class LocalRateLimitRepository implements RateLimitRepository<LocalRateLimit> {
 
-    private final Logger LOGGER = LoggerFactory.getLogger(CachedRateLimitRepository.class);
+    private final Logger LOGGER = LoggerFactory.getLogger(LocalRateLimitRepository.class);
 
     private final Cache cache;
 

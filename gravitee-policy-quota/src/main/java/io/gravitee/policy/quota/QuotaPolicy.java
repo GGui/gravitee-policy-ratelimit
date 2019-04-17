@@ -20,7 +20,6 @@ import io.gravitee.common.util.Maps;
 import io.gravitee.gateway.api.ExecutionContext;
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
-import io.gravitee.node.api.Node;
 import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.PolicyResult;
 import io.gravitee.policy.api.annotations.OnRequest;
@@ -29,7 +28,7 @@ import io.gravitee.policy.quota.configuration.QuotaPolicyConfiguration;
 import io.gravitee.policy.quota.utils.DateUtils;
 import io.gravitee.repository.ratelimit.api.RateLimitService;
 import io.gravitee.repository.ratelimit.model.RateLimit;
-import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +94,7 @@ public class QuotaPolicy {
         QuotaConfiguration quotaConfiguration = quotaPolicyConfiguration.getQuota();
         String key = createRateLimitKey(quotaPolicyConfiguration.isAsync(), request, executionContext);
 
-        Single<RateLimit> single = rateLimitService.incrementAndGet(key, quotaPolicyConfiguration.isAsync(), new Supplier<RateLimit>() {
+        rateLimitService.incrementAndGet(key, quotaPolicyConfiguration.isAsync(), new Supplier<RateLimit>() {
             @Override
             public RateLimit get() {
                 // Set the time at which the current rate limit window resets in UTC epoch seconds.
@@ -105,38 +104,39 @@ public class QuotaPolicy {
                         quotaConfiguration.getPeriodTimeUnit());
 
                 RateLimit rate = new RateLimit(key);
+                rate.setCounter(0);
                 rate.setLimit(quotaConfiguration.getLimit());
                 rate.setResetTime(resetTimeMillis);
-                rate.setAsync(quotaPolicyConfiguration.isAsync());
+                rate.setSubscription((String) executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID));
                 return rate;
             }
-        });
+        })
+                .subscribeOn(Schedulers.io())
+                .subscribe(rate -> {
+                    // Set Rate Limit headers on response
+                    if (quotaPolicyConfiguration.isAddHeaders()) {
+                        response.headers().set(X_QUOTA_LIMIT, Long.toString(quotaConfiguration.getLimit()));
+                        response.headers().set(X_QUOTA_REMAINING, Long.toString(quotaConfiguration.getLimit() - rate.getCounter()));
+                        response.headers().set(X_QUOTA_RESET, Long.toString(rate.getResetTime()));
+                    }
 
-        single.subscribe(rate -> {
-            // Set Rate Limit headers on response
-            if (quotaPolicyConfiguration.isAddHeaders()) {
-                response.headers().set(X_QUOTA_LIMIT, Long.toString(quotaConfiguration.getLimit()));
-                response.headers().set(X_QUOTA_REMAINING, Long.toString(quotaConfiguration.getLimit() - rate.getCounter()));
-                response.headers().set(X_QUOTA_RESET, Long.toString(rate.getResetTime()));
-            }
+                    if (rate.getCounter() <= quotaConfiguration.getLimit()) {
+                        policyChain.doNext(request, response);
+                    } else {
+                        policyChain.failWith(createLimitExceeded(quotaConfiguration));
+                    }
+                }, throwable -> {
+                    // Set Rate Limit headers on response
+                    if (quotaPolicyConfiguration.isAddHeaders()) {
+                        response.headers().set(X_QUOTA_LIMIT, Long.toString(quotaConfiguration.getLimit()));
+                        // We don't know about the remaining calls, let's assume it is the same as the limit
+                        response.headers().set(X_QUOTA_REMAINING, Long.toString(quotaConfiguration.getLimit()));
+                        response.headers().set(X_QUOTA_RESET, Long.toString(-1));
+                    }
 
-            if (rate.getCounter() <= quotaConfiguration.getLimit()) {
-                policyChain.doNext(request, response);
-            } else {
-                policyChain.failWith(createLimitExceeded(quotaConfiguration));
-            }
-        }, throwable -> {
-            // Set Rate Limit headers on response
-            if (quotaPolicyConfiguration.isAddHeaders()) {
-                response.headers().set(X_QUOTA_LIMIT, Long.toString(quotaConfiguration.getLimit()));
-                // We don't know about the remaining calls, let's assume it is the same as the limit
-                response.headers().set(X_QUOTA_REMAINING, Long.toString(quotaConfiguration.getLimit()));
-                response.headers().set(X_QUOTA_RESET, Long.toString(-1));
-            }
-
-            // If an errors occurs at the repository level, we accept the call
-            policyChain.doNext(request, response);
-        });
+                    // If an errors occurs at the repository level, we accept the call
+                    policyChain.doNext(request, response);
+                });
     }
 
     private String createRateLimitKey(boolean async, Request request, ExecutionContext executionContext) {
@@ -146,12 +146,6 @@ public class QuotaPolicy {
         // 3_ SUBSCRIPTION_ID
         // 4_ RESOLVED_PATH
         String resolvedPath = (String) executionContext.getAttribute(ExecutionContext.ATTR_RESOLVED_PATH);
-
-        if (async) {
-            return executionContext.getComponent(Node.class).id() + KEY_SEPARATOR + RATE_LIMIT_TYPE + KEY_SEPARATOR +
-                    executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID) + KEY_SEPARATOR +
-                    ((resolvedPath != null) ? resolvedPath.hashCode() : "");
-        }
 
         return (String) executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID) + KEY_SEPARATOR +
                 RATE_LIMIT_TYPE + KEY_SEPARATOR +
