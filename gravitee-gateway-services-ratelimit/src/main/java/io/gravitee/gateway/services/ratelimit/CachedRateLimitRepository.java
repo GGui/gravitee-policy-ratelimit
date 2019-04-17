@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author GraviteeSource Team
  */
-class CachedRateLimitRepository implements RateLimitRepository {
+class CachedRateLimitRepository implements RateLimitRepository<RateLimit> {
 
     private final Logger LOGGER = LoggerFactory.getLogger(CachedRateLimitRepository.class);
 
@@ -41,7 +41,7 @@ class CachedRateLimitRepository implements RateLimitRepository {
     }
 
     @Override
-    public Single<RateLimit> incrementAndGet(String key, Supplier<RateLimit> supplier) {
+    public Single<RateLimit> incrementAndGet(String key, long weight, Supplier<RateLimit> supplier) {
         throw new IllegalStateException();
     }
 

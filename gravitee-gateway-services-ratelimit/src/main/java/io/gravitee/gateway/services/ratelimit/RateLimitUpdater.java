@@ -51,7 +51,7 @@ class RateLimitUpdater implements Runnable {
                 while (!queue.isEmpty()) {
                     rateLimit = queue.poll(getPollingTimeout(), TimeUnit.MILLISECONDS);
                     if (rateLimit != null) {
-                        delegateRateLimitRepository.save(rateLimit);
+//                        delegateRateLimitRepository.save(rateLimit);
                     }
                 }
             } catch (InterruptedException ie) {

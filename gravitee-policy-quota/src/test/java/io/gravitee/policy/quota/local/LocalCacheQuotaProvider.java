@@ -37,9 +37,9 @@ public class LocalCacheQuotaProvider implements RateLimitService {
     }
 
     @Override
-    public Single<RateLimit> incrementAndGet(String key, boolean async, Supplier<RateLimit> supplier) {
+    public Single<RateLimit> incrementAndGet(String key, long weight, boolean async, Supplier<RateLimit> supplier) {
         RateLimit rateLimit = rateLimits.getOrDefault(key, supplier.get());
-        rateLimit.setCounter(rateLimit.getCounter() + 1);
+        rateLimit.setCounter(rateLimit.getCounter() + weight);
         return Single.just(rateLimit);
     }
 }

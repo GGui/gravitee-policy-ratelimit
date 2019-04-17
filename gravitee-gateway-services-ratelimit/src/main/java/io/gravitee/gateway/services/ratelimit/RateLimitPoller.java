@@ -15,15 +15,11 @@
  */
 package io.gravitee.gateway.services.ratelimit;
 
-import io.gravitee.gateway.services.ratelimit.util.KeySplitter;
 import io.gravitee.node.api.Node;
 import io.gravitee.repository.ratelimit.api.RateLimitRepository;
-import io.gravitee.repository.ratelimit.model.RateLimit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.Iterator;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -43,6 +39,7 @@ class RateLimitPoller implements Runnable {
 
     @Override
     public void run() {
+        /*
         try {
             LOGGER.debug("Refresh rate-limits from repository");
             Iterator<RateLimit> rateLimitIterator = delegateRateLimitRepository.findAsyncAfter(lastCheck);
@@ -76,8 +73,10 @@ class RateLimitPoller implements Runnable {
         } catch (Exception ex) {
             LOGGER.error("Unable to retrieve latest values of rate-limit from repository", ex);
         }
+        */
     }
 
+    /*
     private void updateAggregateRateLimit(String rateLimitKey, RateLimit rateLimit, long hits) {
         RateLimit aggRateLimit = aggregateCacheRateLimitRepository.get(rateLimitKey);
 
@@ -96,6 +95,7 @@ class RateLimitPoller implements Runnable {
         aggregateCacheRateLimitRepository.save(aggRateLimit);
         aggregateCacheRateLimitRepository.save(rateLimit);
     }
+    */
 
     public void setRateLimitRepository(RateLimitRepository delegateRateLimitRepository) {
         this.delegateRateLimitRepository = delegateRateLimitRepository;

@@ -74,7 +74,7 @@ public class AsyncRateLimitService extends AbstractService {
         if (enabled) {
             // Prepare caches
             RateLimitRepository aggregateCacheRateLimitRepository = new CachedRateLimitRepository(aggregateCache);
-            RateLimitRepository localCacheRateLimitRepository = new CachedRateLimitRepository(localCache);
+            LocalRateLimitRepository localCacheRateLimitRepository = new LocalRateLimitRepository(localCache);
 
             // Prepare queue to flush data into the final repository implementation
             BlockingQueue<RateLimit> rateLimitsQueue = new BlockingArrayQueue<>(queueCapacity);
@@ -84,8 +84,8 @@ public class AsyncRateLimitService extends AbstractService {
             AsyncRateLimitRepository asyncRateLimitRepository = new AsyncRateLimitRepository();
             beanFactory.autowireBean(asyncRateLimitRepository);
             asyncRateLimitRepository.setLocalCacheRateLimitRepository(localCacheRateLimitRepository);
-            asyncRateLimitRepository.setAggregateCacheRateLimitRepository(aggregateCacheRateLimitRepository);
-            asyncRateLimitRepository.setRateLimitsQueue(rateLimitsQueue);
+            asyncRateLimitRepository.setRemoteCacheRateLimitRepository(rateLimitRepository);
+            asyncRateLimitRepository.initialize();
 
             LOGGER.info("Register the rate-limit service bridge for synchronous and asynchronous mode");
             DefaultRateLimitService rateLimitService = new DefaultRateLimitService();
