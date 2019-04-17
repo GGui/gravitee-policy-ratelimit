@@ -85,24 +85,7 @@ public class AsyncRateLimitRepository implements RateLimitRepository<LocalRateLi
                 })
                 // We are ok locally, update the local counter
                 .flatMap(localRateLimit -> localCacheRateLimitRepository.save(localRateLimit))
-                .doOnSuccess(new Consumer<LocalRateLimit>() {
-                    @Override
-                    public void accept(LocalRateLimit localRateLimit) throws Exception {
-                        keys.add(localRateLimit.getKey());
-                        /*
-                        Observable
-                                .timer(5000, TimeUnit.MILLISECONDS)
-                                .map((Function<Long, RateLimit>) aLong -> localRateLimit)
-//                                .flatMapSingle((Function<RateLimit, SingleSource<? extends RateLimit>>) rateLimit -> localCacheRateLimitRepository.get(rateLimit.getKey()).toSingle())
-                                .subscribe(new Consumer<RateLimit>() {
-                                    @Override
-                                    public void accept(RateLimit rateLimit) throws Exception {
-                                        keys.add(rateLimit.getKey());
-                                    }
-                                });
-                                */
-                    }
-                });
+                .doOnSuccess(localRateLimit -> keys.add(localRateLimit.getKey()));
     }
 
     private void refresh() {
