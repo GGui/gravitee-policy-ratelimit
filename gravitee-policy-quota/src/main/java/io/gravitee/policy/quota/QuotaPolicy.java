@@ -28,7 +28,6 @@ import io.gravitee.policy.quota.configuration.QuotaPolicyConfiguration;
 import io.gravitee.policy.quota.utils.DateUtils;
 import io.gravitee.repository.ratelimit.api.RateLimitService;
 import io.gravitee.repository.ratelimit.model.RateLimit;
-import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +91,7 @@ public class QuotaPolicy {
         }
 
         QuotaConfiguration quotaConfiguration = quotaPolicyConfiguration.getQuota();
-        String key = createRateLimitKey(quotaPolicyConfiguration.isAsync(), request, executionContext);
+        String key = createRateLimitKey(request, executionContext);
 
         rateLimitService.incrementAndGet(key, quotaPolicyConfiguration.isAsync(), new Supplier<RateLimit>() {
             @Override
@@ -111,7 +110,6 @@ public class QuotaPolicy {
                 return rate;
             }
         })
-                .subscribeOn(Schedulers.io())
                 .subscribe(rate -> {
                     // Set Rate Limit headers on response
                     if (quotaPolicyConfiguration.isAddHeaders()) {
@@ -139,7 +137,7 @@ public class QuotaPolicy {
                 });
     }
 
-    private String createRateLimitKey(boolean async, Request request, ExecutionContext executionContext) {
+    private String createRateLimitKey(Request request, ExecutionContext executionContext) {
         // Rate limit key must contain :
         // 1_ GATEWAY_ID (async mode only)
         // 2_ Rate Type (throttling / quota)
