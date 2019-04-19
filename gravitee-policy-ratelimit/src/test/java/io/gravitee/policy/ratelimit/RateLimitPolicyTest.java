@@ -19,7 +19,6 @@ import io.gravitee.common.http.HttpHeaders;
 import io.gravitee.gateway.api.ExecutionContext;
 import io.gravitee.gateway.api.Request;
 import io.gravitee.gateway.api.Response;
-import io.gravitee.node.api.Node;
 import io.gravitee.policy.api.PolicyChain;
 import io.gravitee.policy.api.PolicyResult;
 import io.gravitee.policy.ratelimit.configuration.RateLimitConfiguration;
@@ -64,9 +63,6 @@ public class RateLimitPolicyTest {
 
     @Mock
     protected ExecutionContext executionContext;
-
-    @Mock
-    private Node node;
 
     @Before
     public void init() {

@@ -114,7 +114,7 @@ public class QuotaPolicy {
                     // Set Rate Limit headers on response
                     if (quotaPolicyConfiguration.isAddHeaders()) {
                         response.headers().set(X_QUOTA_LIMIT, Long.toString(quotaConfiguration.getLimit()));
-                        response.headers().set(X_QUOTA_REMAINING, Long.toString(quotaConfiguration.getLimit() - rate.getCounter()));
+                        response.headers().set(X_QUOTA_REMAINING, Long.toString(Math.max(0, quotaConfiguration.getLimit() - rate.getCounter())));
                         response.headers().set(X_QUOTA_RESET, Long.toString(rate.getResetTime()));
                     }
 
@@ -139,15 +139,20 @@ public class QuotaPolicy {
 
     private String createRateLimitKey(Request request, ExecutionContext executionContext) {
         // Rate limit key must contain :
-        // 1_ GATEWAY_ID (async mode only)
-        // 2_ Rate Type (throttling / quota)
-        // 3_ SUBSCRIPTION_ID
-        // 4_ RESOLVED_PATH
+        // 1_ SUBSCRIPTION_ID
+        // 2_ Rate Type (rate-limit / quota)
+        // 3_ RESOLVED_PATH (policy attached to a path rather than a plan)
         String resolvedPath = (String) executionContext.getAttribute(ExecutionContext.ATTR_RESOLVED_PATH);
 
-        return (String) executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID) + KEY_SEPARATOR +
-                RATE_LIMIT_TYPE + KEY_SEPARATOR +
-                ((resolvedPath != null) ? resolvedPath.hashCode() : "");
+        StringBuffer key = new StringBuffer((String) executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID))
+                .append(KEY_SEPARATOR)
+                .append(RATE_LIMIT_TYPE);
+
+        if (resolvedPath != null) {
+            key.append(KEY_SEPARATOR).append(resolvedPath.hashCode());
+        }
+
+        return key.toString();
     }
 
     private PolicyResult createLimitExceeded(QuotaConfiguration quotaConfiguration) {

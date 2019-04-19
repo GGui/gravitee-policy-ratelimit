@@ -19,11 +19,14 @@ import io.gravitee.repository.ratelimit.api.RateLimitRepository;
 import io.gravitee.repository.ratelimit.model.RateLimit;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
+import io.reactivex.SingleSource;
+import io.reactivex.functions.Function;
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 public class LocalRateLimitRepository implements RateLimitRepository<LocalRateLimit> {
@@ -36,9 +39,34 @@ public class LocalRateLimitRepository implements RateLimitRepository<LocalRateLi
         this.cache = cache;
     }
 
+    private final ReentrantLock lock = new ReentrantLock();
+
     @Override
     public Single<LocalRateLimit> incrementAndGet(String key, long weight, Supplier<RateLimit> supplier) {
-        throw new IllegalStateException();
+        lock.lock();
+
+        return this.get(key)
+                .map((Function<LocalRateLimit, RateLimit>) localRateLimit -> localRateLimit)
+                .switchIfEmpty(Single.defer(() -> Single.just(supplier.get())))
+                .flatMap(new Function<RateLimit, SingleSource<LocalRateLimit>>() {
+                    @Override
+                    public SingleSource<LocalRateLimit> apply(RateLimit rateLimit) throws Exception {
+                        LocalRateLimit localRateLimit = (LocalRateLimit) rateLimit;
+
+                        // Increment local counter
+                        localRateLimit.setLocal(localRateLimit.getLocal() + weight);
+
+                        // We have to update the counter because the policy is based on this one
+                        localRateLimit.setCounter(localRateLimit.getCounter() + weight);
+
+                        return save(localRateLimit);
+                    }
+                })
+                .doOnSuccess(localRateLimit1 -> lock.unlock())
+                .doOnError(throwable -> {
+                    // Ensure that lock is released also on error
+                    lock.unlock();
+                });
     }
 
     @Override
@@ -46,19 +74,39 @@ public class LocalRateLimitRepository implements RateLimitRepository<LocalRateLi
         LOGGER.debug("Retrieve rate-limiting for {} from {}", key, cache.getName());
 
         Element elt = cache.get(key);
-        return (elt != null) ? Maybe.just((LocalRateLimit) elt.getObjectValue()) : Maybe.empty();
+
+        if (elt != null) {
+            LocalRateLimit rateLimit = (LocalRateLimit) elt.getObjectValue();
+
+            if (rateLimit.getResetTime() > System.currentTimeMillis()) {
+                return Maybe.just(rateLimit);
+            }
+
+            cache.remove(key);
+        }
+
+        return Maybe.empty();
     }
 
     @Override
     public Single<LocalRateLimit> save(LocalRateLimit rate) {
-        long ttlInMillis = rate.getResetTime() - System.currentTimeMillis();
-        if (ttlInMillis > 0L) {
-            int ttl = (int) (ttlInMillis / 1000L);
-            LOGGER.debug("Put rate-limiting {} with a TTL {} into {}", rate, ttl, cache.getName());
-            cache.put(new Element(rate.getKey(), rate, 0,ttl));
+        Element elt = cache.get(rate.getKey());
+        if (elt != null) {
+            return Single.just(rate);
+        } else {
+            saveInCache(rate);
             return Single.just(rate);
         }
+    }
 
-        return Single.just(rate);
+    private void saveInCache(LocalRateLimit rate) {
+        long ttlInMillis = rate.getResetTime() - System.currentTimeMillis();
+        int ttl = (int) (ttlInMillis / 1000L);
+        if (ttl > 0) {
+            LOGGER.debug("Put rate-limiting {} with a TTL {} into {}", rate, ttl, cache.getName());
+            cache.put(new Element(rate.getKey(), rate, 0, ttl));
+        } else {
+            cache.put(new Element(rate.getKey(), rate, 0, 0));
+        }
     }
 }

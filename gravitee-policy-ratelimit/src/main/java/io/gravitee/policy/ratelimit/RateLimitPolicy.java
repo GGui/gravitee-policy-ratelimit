@@ -114,7 +114,7 @@ public class RateLimitPolicy {
                     // Set Rate Limit headers on response
                     if (rateLimitPolicyConfiguration.isAddHeaders()) {
                         response.headers().set(X_RATE_LIMIT_LIMIT, Long.toString(rateLimitConfiguration.getLimit()));
-                        response.headers().set(X_RATE_LIMIT_REMAINING, Long.toString(rateLimitConfiguration.getLimit() - rate.getCounter()));
+                        response.headers().set(X_RATE_LIMIT_REMAINING, Long.toString(Math.max(0, rateLimitConfiguration.getLimit() - rate.getCounter())));
                         response.headers().set(X_RATE_LIMIT_RESET, Long.toString(rate.getResetTime()));
                     }
 
@@ -139,23 +139,20 @@ public class RateLimitPolicy {
 
     private String createRateLimitKey(Request request, ExecutionContext executionContext) {
         // Rate limit key must contain :
-        // 1_ GATEWAY_ID (async mode only)
-        // 2_ Rate Type (throttling / quota)
-        // 3_ SUBSCRIPTION_ID
-        // 4_ RESOLVED_PATH
+        // 1_ SUBSCRIPTION_ID
+        // 2_ Rate Type (rate-limit / quota)
+        // 3_ RESOLVED_PATH (policy attached to a path rather than a plan)
         String resolvedPath = (String) executionContext.getAttribute(ExecutionContext.ATTR_RESOLVED_PATH);
 
-        /*
-        if (async) {
-            return executionContext.getComponent(Node.class).id() + KEY_SEPARATOR + RATE_LIMIT_TYPE + KEY_SEPARATOR +
-                    executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID) + KEY_SEPARATOR +
-                    ((resolvedPath != null) ? resolvedPath.hashCode() : "");
-        }
-        */
+        StringBuffer key = new StringBuffer((String) executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID))
+                .append(KEY_SEPARATOR)
+                .append(RATE_LIMIT_TYPE);
 
-        return (String) executionContext.getAttribute(ExecutionContext.ATTR_SUBSCRIPTION_ID) + KEY_SEPARATOR +
-                RATE_LIMIT_TYPE + KEY_SEPARATOR +
-                ((resolvedPath != null) ? resolvedPath.hashCode() : "");
+        if (resolvedPath != null) {
+            key.append(KEY_SEPARATOR).append(resolvedPath.hashCode());
+        }
+
+        return key.toString();
     }
 
     private PolicyResult createLimitExceeded(RateLimitConfiguration rateLimitConfiguration) {
