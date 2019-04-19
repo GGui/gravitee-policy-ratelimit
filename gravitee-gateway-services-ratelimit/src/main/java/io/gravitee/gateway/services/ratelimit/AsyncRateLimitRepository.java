@@ -23,8 +23,11 @@ import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.BiFunction;
+import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -36,6 +39,8 @@ import java.util.function.Supplier;
  * @author GraviteeSource Team
  */
 public class AsyncRateLimitRepository implements RateLimitRepository<LocalRateLimit> {
+
+    private final Logger logger = LoggerFactory.getLogger(AsyncRateLimitRepository.class);
 
     private LocalRateLimitRepository localCacheRateLimitRepository;
     private RateLimitRepository<RateLimit> remoteCacheRateLimitRepository;
@@ -82,6 +87,12 @@ public class AsyncRateLimitRepository implements RateLimitRepository<LocalRateLi
                 // We are ok locally, update the local counter
                 .flatMap(localRateLimit -> localCacheRateLimitRepository.incrementAndGet(key, weight, () -> localRateLimit))
                 .doOnSuccess(localRateLimit -> keys.add(localRateLimit.getKey()))
+                .doOnError(new Consumer<Throwable>() {
+                    @Override
+                    public void accept(Throwable throwable) throws Exception {
+                        logger.error("An unexpected error occurs while managing asynchronous rate-limit", throwable);
+                    }
+                })
                 .subscribeOn(Schedulers.io());
     }
 
@@ -123,6 +134,12 @@ public class AsyncRateLimitRepository implements RateLimitRepository<LocalRateLi
                             // And save the new counter value into the local cache
                             .flatMap((Function<LocalRateLimit, MaybeSource<? extends RateLimit>>) localRateLimit ->
                                     localCacheRateLimitRepository.save(localRateLimit).toMaybe())
+                            .doOnError(new Consumer<Throwable>() {
+                                @Override
+                                public void accept(Throwable throwable) throws Exception {
+                                    logger.error("An unexpected error occurs while refreshing asynchronous rate-limit", throwable);
+                                }
+                            })
                             .subscribe();
                 }
             });
